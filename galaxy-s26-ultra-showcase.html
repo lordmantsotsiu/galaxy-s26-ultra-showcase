@@ -1,0 +1,722 @@
+<style>
+  :root{
+    --void:#07070a;
+    --deep:#0d0e12;
+    --glass-bg: rgba(255,255,255,0.045);
+    --glass-border: rgba(255,255,255,0.11);
+    --text-1:#f1efe9;
+    --text-2: rgba(241,239,233,0.56);
+    --text-3: rgba(241,239,233,0.34);
+    --bronze:#c1926a;
+    --bronze-dim: rgba(193,146,106,0.35);
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;width:100%;height:100%;background:var(--void);overflow:hidden;font-family:var(--sans);-webkit-font-smoothing:antialiased;}
+  #stage{position:relative;width:100%;height:100vh;}
+  #canvas-wrap{position:absolute;inset:0;}
+  canvas{display:block;touch-action:none;}
+
+  #vignette{position:absolute;inset:0;pointer-events:none;z-index:5;
+    background:radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 45%, rgba(0,0,0,0.55) 100%);}
+  #grain{position:absolute;inset:0;pointer-events:none;z-index:6;opacity:0.035;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+
+  .glass{background:var(--glass-bg);border:1px solid var(--glass-border);backdrop-filter: blur(22px) saturate(160%);-webkit-backdrop-filter: blur(22px) saturate(160%);}
+
+  @keyframes riseIn{from{opacity:0;transform:translateY(22px);}to{opacity:1;transform:translateY(0);}}
+  @keyframes riseInSide{from{opacity:0;transform:translateX(18px);}to{opacity:1;transform:translateX(0);}}
+  @keyframes ringPulse{0%{transform:scale(0.35);opacity:0.85;}100%{transform:scale(2.6);opacity:0;}}
+  @keyframes softPulse{0%,100%{opacity:0.55;}50%{opacity:1;}}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  @media (prefers-reduced-motion: reduce){
+    .anim, .anim-1, .anim-2, .anim-3, .anim-4, .anim-5{animation:none !important;opacity:1 !important;transform:none !important;}
+    .pulse-ring{animation:none !important;}
+  }
+
+  /* ---------- loader ---------- */
+  #loader{position:absolute;inset:0;z-index:100;background:var(--void);display:flex;align-items:center;justify-content:center;transition:opacity .9s ease, visibility .9s;}
+  #loader.hidden{opacity:0;visibility:hidden;pointer-events:none;}
+  .loader-inner{display:flex;flex-direction:column;align-items:center;gap:18px;}
+  .loader-ring{width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,0.14);border-top-color:var(--bronze);animation:spin 1.1s linear infinite;}
+  .loader-text{font-size:10px;letter-spacing:0.32em;color:var(--text-3);text-transform:uppercase;}
+
+  /* ---------- brand ---------- */
+  .brand{position:absolute;top:44px;left:48px;z-index:10;max-width:360px;}
+  .brand .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:0.28em;text-transform:uppercase;color:var(--bronze);opacity:0;animation:riseIn .9s cubic-bezier(.2,.8,.2,1) forwards;animation-delay:.15s;}
+  .brand h1{font-size:clamp(30px,4vw,46px);font-weight:200;letter-spacing:0.05em;margin:10px 0 0;color:var(--text-1);opacity:0;animation:riseIn .9s cubic-bezier(.2,.8,.2,1) forwards;animation-delay:.32s;}
+  .brand p{font-size:13px;line-height:1.65;color:var(--text-2);margin-top:12px;letter-spacing:0.01em;font-weight:300;opacity:0;animation:riseIn .9s cubic-bezier(.2,.8,.2,1) forwards;animation-delay:.5s;}
+
+  /* ---------- hint ---------- */
+  .hint{position:absolute;bottom:44px;right:52px;z-index:10;font-family:var(--mono);font-size:10px;letter-spacing:0.24em;color:var(--text-3);text-transform:uppercase;opacity:0;animation:riseIn .9s ease forwards;animation-delay:1.1s;display:flex;align-items:center;gap:8px;}
+  .hint svg{opacity:.6;}
+
+  /* ---------- configurator ---------- */
+  .configurator{position:absolute;left:48px;bottom:44px;z-index:10;width:308px;border-radius:18px;padding:22px 24px 20px;opacity:0;animation:riseIn .9s cubic-bezier(.2,.8,.2,1) forwards;animation-delay:.7s;}
+  .config-row-top{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px;}
+  .config-label{font-family:var(--mono);font-size:10px;letter-spacing:0.26em;text-transform:uppercase;color:var(--text-3);}
+  .finish-name{font-size:12.5px;color:var(--text-1);letter-spacing:0.02em;font-weight:400;}
+  .swatches{display:flex;gap:10px;margin-bottom:18px;}
+  .swatch{width:27px;height:27px;border-radius:50%;cursor:pointer;border:none;padding:0;position:relative;box-shadow:inset 0 0 0 1px rgba(255,255,255,0.18);transition:transform .3s cubic-bezier(.2,.8,.2,1);flex-shrink:0;}
+  .swatch::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:1px solid transparent;transition:border-color .3s ease;}
+  .swatch:hover{transform:scale(1.1);}
+  .swatch.active::after{border-color:rgba(255,255,255,0.75);}
+  .swatch:focus-visible{outline:2px solid var(--bronze);outline-offset:4px;}
+
+  .divider{height:1px;background:var(--glass-border);margin:16px 0;}
+
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;}
+  .toggle-row .t-label{font-size:12.5px;color:var(--text-1);letter-spacing:0.02em;}
+  .toggle-row .t-sub{font-family:var(--mono);font-size:9.5px;color:var(--text-3);letter-spacing:0.12em;margin-top:3px;text-transform:uppercase;}
+  .toggle{width:42px;height:23px;border-radius:13px;background:rgba(255,255,255,0.12);position:relative;cursor:pointer;transition:background .35s ease;flex-shrink:0;border:none;padding:0;}
+  .toggle.on{background:linear-gradient(90deg,#8a6a4c,var(--bronze));}
+  .toggle .knob{position:absolute;top:3px;left:3px;width:17px;height:17px;border-radius:50%;background:#f4f2ee;transition:left .35s cubic-bezier(.2,.9,.25,1);box-shadow:0 2px 5px rgba(0,0,0,.5);}
+  .toggle.on .knob{left:22px;}
+  .toggle:focus-visible{outline:2px solid var(--bronze);outline-offset:4px;}
+
+  /* ---------- hotspots ---------- */
+  #hotspot-layer{position:absolute;inset:0;z-index:8;pointer-events:none;}
+  .hotspot{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;pointer-events:auto;cursor:pointer;transition:opacity .4s ease;background:none;border:none;padding:0;}
+  .hotspot .dot{position:absolute;top:9px;left:9px;width:8px;height:8px;border-radius:50%;background:#fff;box-shadow:0 0 10px 2px rgba(255,255,255,.85);}
+  .hotspot .pulse-ring{position:absolute;inset:2px;border-radius:50%;border:1px solid rgba(255,255,255,0.75);animation:ringPulse 2.4s ease-out infinite;}
+  .hotspot .tag{position:absolute;top:16px;left:16px;font-family:var(--mono);font-size:9.5px;letter-spacing:0.14em;color:var(--text-1);white-space:nowrap;background:rgba(10,10,12,0.55);border:1px solid var(--glass-border);padding:3px 8px;border-radius:20px;opacity:0;transform:translateX(-4px);transition:opacity .3s ease, transform .3s ease;backdrop-filter:blur(8px);}
+  .hotspot:hover .tag{opacity:1;transform:translateX(0);}
+  .hotspot:focus-visible{outline:2px solid var(--bronze);outline-offset:4px;border-radius:50%;}
+
+  /* ---------- spec panel ---------- */
+  .spec-panel{position:absolute;top:0;right:0;height:100%;width:min(380px,88vw);z-index:20;padding:110px 40px 40px;border-left:1px solid var(--glass-border);transform:translateX(100%);transition:transform .6s cubic-bezier(.16,1,.3,1);}
+  .spec-panel.open{transform:translateX(0);}
+  .close-btn{position:absolute;top:44px;right:40px;width:32px;height:32px;border-radius:50%;border:1px solid var(--glass-border);background:transparent;color:var(--text-2);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .25s ease, color .25s ease;}
+  .close-btn:hover{border-color:var(--text-2);color:var(--text-1);}
+  .close-btn:focus-visible{outline:2px solid var(--bronze);outline-offset:3px;}
+  .spec-tag{font-family:var(--mono);font-size:10px;letter-spacing:0.24em;color:var(--bronze);text-transform:uppercase;}
+  .spec-title{font-size:26px;font-weight:200;letter-spacing:0.03em;color:var(--text-1);margin:12px 0 22px;}
+  .spec-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;}
+  .spec-list li{padding:16px 0;border-top:1px solid var(--glass-border);display:flex;flex-direction:column;gap:4px;}
+  .spec-list li:last-child{border-bottom:1px solid var(--glass-border);}
+  .spec-k{font-family:var(--mono);font-size:9.5px;letter-spacing:0.18em;color:var(--text-3);text-transform:uppercase;}
+  .spec-v{font-size:14.5px;color:var(--text-1);font-weight:300;letter-spacing:0.01em;}
+
+  /* ---------- misc ---------- */
+  .kbd-skip{position:absolute;left:-999px;}
+  ::selection{background:var(--bronze-dim);}
+</style>
+
+<div id="stage">
+  <div id="loader">
+    <div class="loader-inner">
+      <div class="loader-ring"></div>
+      <div class="loader-text">Preparing Showcase</div>
+    </div>
+  </div>
+
+  <div id="canvas-wrap"></div>
+  <div id="vignette"></div>
+  <div id="grain"></div>
+  <div id="hotspot-layer"></div>
+
+  <div class="brand">
+    <div class="eyebrow">Samsung &middot; Galaxy S Series &middot; 2026</div>
+    <h1>GALAXY S26&nbsp;ULTRA</h1>
+    <p>An Armor Aluminum frame, a display built to dim for anyone but you, and Snapdragon 8 Elite Gen 5 tuned for Galaxy. Rotate the device, change its finish, and open it up to see how it's built.</p>
+    <p style="margin-top:12px;font-size:11px;color:var(--text-3);font-family:var(--mono);letter-spacing:0.06em;opacity:0;animation:riseIn .9s cubic-bezier(.2,.8,.2,1) forwards;animation-delay:.62s;">From R30,999 &middot; Released March 2026</p>
+  </div>
+
+  <div class="hint">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 3v18M5 8l-2 4 2 4M19 8l2 4-2 4"/></svg>
+    Drag to rotate &middot; Scroll to zoom
+  </div>
+
+  <div class="configurator glass" style="border-radius:18px;">
+    <div class="config-row-top">
+      <div class="config-label">Finish</div>
+      <div class="finish-name" id="finishName">Cobalt Violet</div>
+    </div>
+    <div class="swatches" id="swatches"></div>
+    <div class="divider"></div>
+    <div class="toggle-row">
+      <div>
+        <div class="t-label">Exploded View</div>
+        <div class="t-sub">Component layers</div>
+      </div>
+      <button class="toggle" id="explodeToggle" aria-pressed="false" aria-label="Toggle exploded view"><div class="knob"></div></button>
+    </div>
+  </div>
+
+  <aside class="spec-panel glass" id="specPanel" aria-hidden="true">
+    <button class="close-btn" id="closeSpec" aria-label="Close specifications">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+    <div class="spec-tag" id="specTag">01 &mdash; Display</div>
+    <div class="spec-title" id="specTitle">Dynamic Display</div>
+    <ul class="spec-list" id="specList"></ul>
+  </aside>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ============================================================
+     CONFIG DATA
+  ============================================================ */
+  var FINISHES = [
+    { name: "Cobalt Violet", hex: 0x4b4f8a },
+    { name: "Sky Blue",      hex: 0x9fc3de },
+    { name: "Black",         hex: 0x18191c },
+    { name: "White",         hex: 0xeeefec },
+    { name: "Silver Shadow", hex: 0x9ea1a3 },
+    { name: "Pink Gold",     hex: 0xd2a08f }
+  ];
+
+  var SPECS = {
+    display: {
+      tag: "01 \u2014 Display",
+      title: "Dynamic Display",
+      items: [
+        { k: "Panel", v: "6.9\u2033 Dynamic LTPO AMOLED 2X" },
+        { k: "Resolution", v: "1440 \u00d7 3120 \u00b7 ~500 ppi" },
+        { k: "Refresh Rate", v: "1\u2013120Hz Adaptive" },
+        { k: "Peak Brightness", v: "2,600 nits" },
+        { k: "Protection", v: "Corning Gorilla Armor 2" },
+        { k: "Signature", v: "Privacy Display \u2014 world-first" }
+      ]
+    },
+    camera: {
+      tag: "02 \u2014 Camera",
+      title: "Camera System",
+      items: [
+        { k: "Wide", v: "200MP, f/1.4, OIS" },
+        { k: "Periscope Tele", v: "50MP, 5x optical, OIS" },
+        { k: "Telephoto", v: "10MP, 3x optical, OIS" },
+        { k: "Ultra Wide", v: "50MP, f/1.9, 120\u00b0" },
+        { k: "Selfie", v: "12MP wide, f/2.2" },
+        { k: "Video", v: "8K@30fps \u00b7 gyro-EIS" }
+      ]
+    },
+    performance: {
+      tag: "03 \u2014 Performance",
+      title: "Power & Build",
+      items: [
+        { k: "Chipset", v: "Snapdragon 8 Elite Gen 5, 3nm" },
+        { k: "Memory", v: "12/16GB RAM \u00b7 256GB\u20131TB" },
+        { k: "Battery", v: "5,000 mAh" },
+        { k: "Charging", v: "60W wired \u00b7 75% / 30min" },
+        { k: "Build", v: "Armor Aluminum 2 \u00b7 IP68" },
+        { k: "Software", v: "Android 16 \u00b7 One UI 8.5" },
+        { k: "Price (256/512GB/1TB)", v: "R30,999 \u00b7 R34,999 \u00b7 R35,999" }
+      ]
+    }
+  };
+
+  /* ============================================================
+     THREE SETUP
+  ============================================================ */
+  var wrap = document.getElementById('canvas-wrap');
+  var scene = new THREE.Scene();
+  scene.background = makeBackdropTexture();
+
+  var camera = new THREE.PerspectiveCamera(32, window.innerWidth/window.innerHeight, 0.1, 100);
+
+  var renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.15;
+  wrap.appendChild(renderer.domElement);
+
+  function makeBackdropTexture(){
+    var c = document.createElement('canvas'); c.width = 512; c.height = 512;
+    var ctx = c.getContext('2d');
+    var g = ctx.createRadialGradient(256,230,40,256,230,420);
+    g.addColorStop(0, '#101114');
+    g.addColorStop(0.55, '#0a0a0d');
+    g.addColorStop(1, '#050506');
+    ctx.fillStyle = g; ctx.fillRect(0,0,512,512);
+    return new THREE.CanvasTexture(c);
+  }
+
+  /* ---------- lighting: professional 3-point + rim ---------- */
+  var ambient = new THREE.AmbientLight(0xffffff, 0.4);
+  scene.add(ambient);
+
+  var key = new THREE.DirectionalLight(0xfff3e6, 1.25);
+  key.position.set(-4.5, 6.5, 4.5);
+  key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.radius = 6;
+  key.shadow.camera.left = -3; key.shadow.camera.right = 3;
+  key.shadow.camera.top = 3; key.shadow.camera.bottom = -3;
+  key.shadow.camera.near = 1; key.shadow.camera.far = 15;
+  key.shadow.bias = -0.0015;
+  scene.add(key);
+
+  var rimTarget = new THREE.Object3D();
+  rimTarget.position.set(0.35, 0.4, -0.2);
+  scene.add(rimTarget);
+
+  var rim = new THREE.SpotLight(0xdfe9ff, 6.5, 12, 0.32, 0.45, 1.4);
+  rim.position.set(3.6, 2.6, -3.4);
+  rim.target = rimTarget;
+  scene.add(rim);
+
+  var fill = new THREE.DirectionalLight(0x8fa3c0, 0.28);
+  fill.position.set(1.5, -1.2, 3.5);
+  scene.add(fill);
+
+  var sparkle = new THREE.PointLight(0xffffff, 0.5, 8, 2);
+  sparkle.position.set(-1.2, 2.4, 2.6);
+  scene.add(sparkle);
+
+  /* ---------- shadow-catcher floor ---------- */
+  var floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(30, 30),
+    new THREE.ShadowMaterial({ opacity: 0.55 })
+  );
+  floor.rotation.x = -Math.PI/2;
+  floor.position.y = -1.62;
+  floor.receiveShadow = true;
+  scene.add(floor);
+
+  /* ---------- ambient dust particles ---------- */
+  var dustGeo = new THREE.BufferGeometry();
+  var DUST_N = 70;
+  var dustPos = new Float32Array(DUST_N*3);
+  for (var i=0;i<DUST_N;i++){
+    dustPos[i*3] = (Math.random()-0.5)*9;
+    dustPos[i*3+1] = (Math.random()-0.5)*6;
+    dustPos[i*3+2] = (Math.random()-0.5)*6;
+  }
+  dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+  var dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({ color: 0xd8d2c6, size: 0.014, transparent:true, opacity:0.35, sizeAttenuation:true }));
+  scene.add(dust);
+
+  /* ============================================================
+     PHONE GEOMETRY
+  ============================================================ */
+  function roundedRectShape(w, h, r){
+    var shape = new THREE.Shape();
+    var x = -w/2, y = -h/2;
+    shape.moveTo(x, y + r);
+    shape.lineTo(x, y + h - r);
+    shape.quadraticCurveTo(x, y+h, x+r, y+h);
+    shape.lineTo(x+w-r, y+h);
+    shape.quadraticCurveTo(x+w, y+h, x+w, y+h-r);
+    shape.lineTo(x+w, y+r);
+    shape.quadraticCurveTo(x+w, y, x+w-r, y);
+    shape.lineTo(x+r, y);
+    shape.quadraticCurveTo(x, y, x, y+r);
+    return shape;
+  }
+
+  // Live screen: a lock-screen style canvas texture that redraws the
+  // real current time. Regenerated every second so it always shows "now".
+  var screenCanvas = document.createElement('canvas');
+  screenCanvas.width = 420; screenCanvas.height = 860;
+  var screenCtx = screenCanvas.getContext('2d');
+  var screenTex = new THREE.CanvasTexture(screenCanvas);
+  screenTex.encoding = THREE.sRGBEncoding;
+
+  var WEEKDAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  function drawLockScreen(){
+    var ctx = screenCtx, w = screenCanvas.width, h = screenCanvas.height;
+
+    var g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, '#1c2030');
+    g.addColorStop(0.55, '#12141f');
+    g.addColorStop(1, '#07070b');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+
+    var bloom = ctx.createRadialGradient(w*0.5, h*0.3, 10, w*0.5, h*0.3, h*0.55);
+    bloom.addColorStop(0, 'rgba(160,178,214,0.20)');
+    bloom.addColorStop(1, 'rgba(160,178,214,0)');
+    ctx.fillStyle = bloom; ctx.fillRect(0, 0, w, h);
+
+    // status bar
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.font = '500 15px -apple-system, "Segoe UI", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('5G', 24, 34);
+    ctx.textAlign = 'right';
+    ctx.fillText('86%', w-24, 34);
+
+    // selfie punch-hole
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.arc(w/2, 40, 12, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 2; ctx.stroke();
+
+    var now = new Date();
+    var hh = String(now.getHours()).padStart(2, '0');
+    var mm = String(now.getMinutes()).padStart(2, '0');
+    var dateStr = WEEKDAYS[now.getDay()] + ', ' + now.getDate() + ' ' + MONTHS[now.getMonth()];
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(255,255,255,0.97)';
+    ctx.font = '200 132px -apple-system, "Segoe UI", sans-serif';
+    ctx.fillText(hh + ':' + mm, w/2, h*0.29);
+
+    ctx.font = '400 28px -apple-system, "Segoe UI", sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.62)';
+    ctx.fillText(dateStr, w/2, h*0.29 + 46);
+
+    // bottom shortcuts (flashlight / camera)
+    ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(w*0.22, h*0.935, 22, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(w*0.78, h*0.935, 22, 0, Math.PI*2); ctx.stroke();
+
+    screenTex.needsUpdate = true;
+  }
+  drawLockScreen();
+  setInterval(drawLockScreen, 1000);
+
+  var phone = new THREE.Group();
+  scene.add(phone);
+
+  var layers = []; // { mesh, restZ, explodeZ }
+  var colorMaterials = []; // materials that follow the finish color
+
+  var W = 1.42, H = 2.92, R = 0.2;
+
+  // Mid-frame / chassis (Armor Aluminum 2)
+  var chassisShape = roundedRectShape(W, H, R);
+  var chassisGeo = new THREE.ExtrudeGeometry(chassisShape, { depth: 0.16, bevelEnabled:true, bevelThickness:0.022, bevelSize:0.022, bevelSegments:8, curveSegments:28 });
+  chassisGeo.center();
+  chassisGeo.computeBoundingBox();
+  var chassisFrontZ = chassisGeo.boundingBox.max.z; // exact z of the frame's front face -- glass/screen must clear this
+  var chassisMat = new THREE.MeshStandardMaterial({ color: FINISHES[0].hex, metalness: 0.9, roughness: 0.155 });
+  var chassis = new THREE.Mesh(chassisGeo, chassisMat);
+  chassis.castShadow = true; chassis.receiveShadow = true;
+  phone.add(chassis);
+  layers.push({ mesh: chassis, restZ: 0, explodeZ: 0 });
+  colorMaterials.push(chassisMat);
+
+  // Front glass (a thin, mostly-transparent glass layer -- the screen
+  // beneath does the actual work of looking like a display)
+  var frontShape = roundedRectShape(W-0.05, H-0.05, R-0.03);
+  var frontGeo = new THREE.ExtrudeGeometry(frontShape, { depth: 0.02, bevelEnabled:false, curveSegments:28 });
+  frontGeo.center();
+  var frontMat = new THREE.MeshPhysicalMaterial({ color: 0xe8ecf2, transparent: true, opacity: 0.1, metalness: 0.05, roughness: 0.05, clearcoat: 1, clearcoatRoughness: 0.04, envMapIntensity: 1.4, depthWrite: false });
+  var frontGlass = new THREE.Mesh(frontGeo, frontMat);
+  frontGlass.position.z = chassisFrontZ + 0.02;
+  frontGlass.renderOrder = 2;
+  phone.add(frontGlass);
+  layers.push({ mesh: frontGlass, restZ: chassisFrontZ + 0.02, explodeZ: 0.95 });
+
+  // Display -- the real screen, always-on regardless of chosen finish.
+  // Positioned just in front of the chassis's own face (but behind the
+  // cover glass) so it's never hidden behind the frame in normal view.
+  var dispGeo = new THREE.PlaneGeometry(W-0.09, H-0.09);
+  var dispMat = new THREE.MeshBasicMaterial({ map: screenTex });
+  var display = new THREE.Mesh(dispGeo, dispMat);
+  display.position.z = chassisFrontZ + 0.008;
+  phone.add(display);
+  layers.push({ mesh: display, restZ: chassisFrontZ + 0.008, explodeZ: 0.62 });
+
+
+  // Battery / board
+  var boardGeo = new THREE.BoxGeometry(W-0.28, H-0.5, 0.05);
+  var boardMat = new THREE.MeshStandardMaterial({ color: 0x2a3b2f, metalness: 0.35, roughness: 0.55 });
+  var board = new THREE.Mesh(boardGeo, boardMat);
+  board.position.z = -0.02;
+  board.castShadow = true;
+  phone.add(board);
+  layers.push({ mesh: board, restZ: -0.02, explodeZ: -0.42 });
+
+  // Back glass
+  var backShape = roundedRectShape(W-0.03, H-0.03, R-0.015);
+  var backGeo = new THREE.ExtrudeGeometry(backShape, { depth: 0.02, bevelEnabled:false, curveSegments:28 });
+  backGeo.center();
+  var backMat = new THREE.MeshPhysicalMaterial({ color: FINISHES[0].hex, metalness: 0.55, roughness: 0.22, clearcoat: 0.6, clearcoatRoughness: 0.25 });
+  var backGlass = new THREE.Mesh(backGeo, backMat);
+  backGlass.position.z = -0.085;
+  backGlass.castShadow = true; backGlass.receiveShadow = true;
+  phone.add(backGlass);
+  layers.push({ mesh: backGlass, restZ: -0.085, explodeZ: -0.85 });
+  colorMaterials.push(backMat);
+
+  // Camera module
+  var cameraGroup = new THREE.Group();
+  cameraGroup.position.set(-0.33, 0.98, -0.1);
+  phone.add(cameraGroup);
+  layers.push({ mesh: cameraGroup, restZ: -0.1, explodeZ: -1.15, isGroup:true, baseX:-0.33, baseY:0.98 });
+
+  // Real Ultra-series cameras aren't set in one shared island -- each lens is
+  // individually cut into the back glass. 200MP wide, 50MP ultra wide,
+  // 10MP 3x tele and 50MP 5x periscope tele, plus laser AF and LED flash.
+  var glassMat = new THREE.MeshPhysicalMaterial({ color: 0x040404, metalness: 0.2, roughness: 0.08, clearcoat: 1, clearcoatRoughness: 0.06 });
+
+  function makeLens(x, y, ringR, glassR, ringMat){
+    var ring = new THREE.Mesh(new THREE.CylinderGeometry(ringR, ringR, 0.05, 36), ringMat);
+    ring.rotation.x = Math.PI/2;
+    ring.position.set(x, y, 0.02);
+    ring.castShadow = true; ring.receiveShadow = true;
+    cameraGroup.add(ring);
+    var glass = new THREE.Mesh(new THREE.CylinderGeometry(glassR, glassR, 0.02, 36), glassMat);
+    glass.rotation.x = Math.PI/2;
+    glass.position.set(x, y, 0.046);
+    cameraGroup.add(glass);
+  }
+
+  var lensRingMat = new THREE.MeshStandardMaterial({ color: 0x3d3f43, metalness: 0.85, roughness: 0.22 });
+
+  makeLens(-0.17,  0.30, 0.175, 0.145, lensRingMat); // 200MP Wide
+  makeLens( 0.17,  0.30, 0.155, 0.125, lensRingMat); // 50MP Ultra Wide
+  makeLens(-0.17, -0.05, 0.140, 0.112, lensRingMat); // 10MP Tele 3x
+  makeLens( 0.17, -0.05, 0.150, 0.120, lensRingMat); // 50MP Periscope Tele 5x
+
+  var laserAF = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.02, 20), new THREE.MeshStandardMaterial({ color: 0x0c0c0d, metalness: 0.3, roughness: 0.4 }));
+  laserAF.rotation.x = Math.PI/2;
+  laserAF.position.set(-0.17, -0.34, 0.02);
+  cameraGroup.add(laserAF);
+
+  var flash = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.02, 20), new THREE.MeshStandardMaterial({ color: 0xfff4de, emissive: 0xfff4de, emissiveIntensity: 0.4, metalness:0.1, roughness:0.4 }));
+  flash.rotation.x = Math.PI/2;
+  flash.position.set(0.17, -0.34, 0.02);
+  cameraGroup.add(flash);
+
+  // side buttons -- sized and offset so they clearly protrude from the frame
+  var btnMat = new THREE.MeshStandardMaterial({ color: FINISHES[0].hex, metalness: 0.9, roughness: 0.16 });
+  colorMaterials.push(btnMat);
+  var powerBtn = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.32, 0.1), btnMat);
+  powerBtn.position.set(W/2 + 0.02, 0.38, 0);
+  powerBtn.castShadow = true;
+  phone.add(powerBtn);
+  var volBtn = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.5, 0.1), btnMat);
+  volBtn.position.set(W/2 + 0.02, -0.1, 0);
+  volBtn.castShadow = true;
+  phone.add(volBtn);
+
+  // S Pen slot -- fixed dark, doesn't change with finish
+  var penSlot = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.03, 0.05), new THREE.MeshStandardMaterial({ color: 0x08080a, metalness: 0.2, roughness: 0.75 }));
+  penSlot.position.set(0.42, -H/2 + 0.015, 0);
+  phone.add(penSlot);
+
+  phone.rotation.x = 0.02;
+
+  /* ============================================================
+     COLOR CONFIGURATOR (lerp transition)
+  ============================================================ */
+  var targetColor = new THREE.Color(FINISHES[0].hex);
+  colorMaterials.forEach(function(m){ m.userData.current = m.color.clone(); });
+
+  function setFinish(idx){
+    var f = FINISHES[idx];
+    targetColor.setHex(f.hex);
+    document.getElementById('finishName').textContent = f.name;
+    var chips = document.querySelectorAll('.swatch');
+    chips.forEach(function(c, i){ c.classList.toggle('active', i === idx); });
+  }
+
+  /* ============================================================
+     EXPLODED VIEW
+  ============================================================ */
+  var exploded = false;
+  var explodeToggle = document.getElementById('explodeToggle');
+  explodeToggle.addEventListener('click', function(){
+    exploded = !exploded;
+    explodeToggle.classList.toggle('on', exploded);
+    explodeToggle.setAttribute('aria-pressed', exploded ? 'true' : 'false');
+    setHotspotsVisible(!exploded);
+  });
+
+  /* ============================================================
+     CUSTOM ORBIT CONTROLS (drei/OrbitControls not available here)
+  ============================================================ */
+  var ctl = {
+    radius: 4.6, targetRadius: 4.6, minRadius: 3.3, maxRadius: 6.4,
+    theta: 0.55, targetTheta: 0.55,
+    phi: 1.18, targetPhi: 1.18, minPhi: 0.32, maxPhi: Math.PI/2 - 0.02,
+    isDown: false, lastX: 0, lastY: 0,
+    autoRotate: true, idle: 0,
+    pinchDist: null
+  };
+
+  var dom = renderer.domElement;
+  function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+
+  function pointerDown(x, y){ ctl.isDown = true; ctl.lastX = x; ctl.lastY = y; ctl.autoRotate = false; ctl.idle = 0; }
+  function pointerMove(x, y){
+    if (!ctl.isDown) return;
+    var dx = x - ctl.lastX, dy = y - ctl.lastY;
+    ctl.lastX = x; ctl.lastY = y;
+    ctl.targetTheta -= dx * 0.0062;
+    ctl.targetPhi = clamp(ctl.targetPhi - dy * 0.0062, ctl.minPhi, ctl.maxPhi);
+  }
+  function pointerUp(){ ctl.isDown = false; ctl.idle = 0; }
+
+  dom.addEventListener('pointerdown', function(e){ pointerDown(e.clientX, e.clientY); });
+  window.addEventListener('pointermove', function(e){ pointerMove(e.clientX, e.clientY); });
+  window.addEventListener('pointerup', pointerUp);
+  dom.addEventListener('wheel', function(e){
+    e.preventDefault();
+    ctl.targetRadius = clamp(ctl.targetRadius + e.deltaY * 0.0026, ctl.minRadius, ctl.maxRadius);
+    ctl.autoRotate = false; ctl.idle = 0;
+  }, { passive:false });
+
+  // basic pinch-zoom for touch
+  dom.addEventListener('touchmove', function(e){
+    if (e.touches.length === 2){
+      var d = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY);
+      if (ctl.pinchDist != null){
+        ctl.targetRadius = clamp(ctl.targetRadius - (d - ctl.pinchDist) * 0.01, ctl.minRadius, ctl.maxRadius);
+      }
+      ctl.pinchDist = d;
+      ctl.autoRotate = false; ctl.idle = 0;
+    }
+  }, { passive:true });
+  dom.addEventListener('touchend', function(){ ctl.pinchDist = null; });
+
+  /* ============================================================
+     HOTSPOTS
+  ============================================================ */
+  var hotspotLayer = document.getElementById('hotspot-layer');
+  var HOTSPOTS = [
+    { key: 'display',     localPos: new THREE.Vector3(0, 0.35, 0.11), normal: new THREE.Vector3(0,0,1), label: 'Display' },
+    { key: 'camera',      localPos: new THREE.Vector3(-0.33, 0.98, -0.14), normal: new THREE.Vector3(0,0,-1), label: 'Camera' },
+    { key: 'performance', localPos: new THREE.Vector3(0.1, -0.75, -0.1), normal: new THREE.Vector3(0,0,-1), label: 'Performance' }
+  ];
+  var hotspotEls = {};
+  HOTSPOTS.forEach(function(h){
+    var el = document.createElement('button');
+    el.className = 'hotspot';
+    el.setAttribute('aria-label', 'View ' + h.label + ' specifications');
+    el.innerHTML = '<span class="pulse-ring"></span><span class="dot"></span><span class="tag">' + h.label + '</span>';
+    el.addEventListener('click', function(){ openSpec(h.key); });
+    hotspotLayer.appendChild(el);
+    hotspotEls[h.key] = el;
+  });
+  function setHotspotsVisible(v){
+    Object.keys(hotspotEls).forEach(function(k){ hotspotEls[k].style.opacity = v ? '' : '0'; hotspotEls[k].style.pointerEvents = v ? 'auto' : 'none'; });
+  }
+
+  var _v = new THREE.Vector3(), _n = new THREE.Vector3(), _camDir = new THREE.Vector3();
+  function updateHotspots(){
+    if (exploded) return;
+    HOTSPOTS.forEach(function(h){
+      _v.copy(h.localPos).applyMatrix4(phone.matrixWorld);
+      _n.copy(h.normal).transformDirection(phone.matrixWorld).normalize();
+      _camDir.copy(camera.position).sub(_v).normalize();
+      var facing = _n.dot(_camDir);
+      var vis = _v.clone().project(camera);
+      var el = hotspotEls[h.key];
+      var onScreen = vis.z < 1 && facing > 0.08;
+      el.style.left = ((vis.x*0.5+0.5)*window.innerWidth) + 'px';
+      el.style.top = ((-vis.y*0.5+0.5)*window.innerHeight) + 'px';
+      el.style.opacity = onScreen ? '' : '0';
+      el.style.pointerEvents = onScreen ? 'auto' : 'none';
+    });
+  }
+
+  /* ============================================================
+     SPEC PANEL
+  ============================================================ */
+  var specPanel = document.getElementById('specPanel');
+  function openSpec(key){
+    var s = SPECS[key];
+    document.getElementById('specTag').textContent = s.tag;
+    document.getElementById('specTitle').textContent = s.title;
+    var list = document.getElementById('specList');
+    list.innerHTML = '';
+    s.items.forEach(function(it){
+      var li = document.createElement('li');
+      li.innerHTML = '<span class="spec-k">' + it.k + '</span><span class="spec-v">' + it.v + '</span>';
+      list.appendChild(li);
+    });
+    specPanel.classList.add('open');
+    specPanel.setAttribute('aria-hidden', 'false');
+  }
+  function closeSpec(){
+    specPanel.classList.remove('open');
+    specPanel.setAttribute('aria-hidden', 'true');
+  }
+  document.getElementById('closeSpec').addEventListener('click', closeSpec);
+
+  /* ============================================================
+     UI: SWATCHES
+  ============================================================ */
+  var swatchWrap = document.getElementById('swatches');
+  FINISHES.forEach(function(f, i){
+    var b = document.createElement('button');
+    b.className = 'swatch' + (i === 0 ? ' active' : '');
+    b.style.background = '#' + f.hex.toString(16).padStart(6, '0');
+    b.setAttribute('aria-label', f.name);
+    b.addEventListener('click', function(){ setFinish(i); });
+    swatchWrap.appendChild(b);
+  });
+
+  /* ============================================================
+     RESIZE
+  ============================================================ */
+  window.addEventListener('resize', function(){
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  /* ============================================================
+     ANIMATE
+  ============================================================ */
+  var tmpColor = new THREE.Color();
+  function animate(){
+    requestAnimationFrame(animate);
+
+    // orbit damping
+    if (ctl.autoRotate && !reduceMotion) ctl.targetTheta += 0.0014;
+    else if (!ctl.isDown){ ctl.idle++; if (ctl.idle > 260) ctl.autoRotate = true; }
+
+    ctl.theta += (ctl.targetTheta - ctl.theta) * 0.065;
+    ctl.phi   += (ctl.targetPhi   - ctl.phi)   * 0.065;
+    ctl.radius+= (ctl.targetRadius- ctl.radius)* 0.08;
+
+    camera.position.set(
+      ctl.radius * Math.sin(ctl.phi) * Math.sin(ctl.theta),
+      ctl.radius * Math.cos(ctl.phi) + 0.12,
+      ctl.radius * Math.sin(ctl.phi) * Math.cos(ctl.theta)
+    );
+    camera.lookAt(0, 0.15, 0);
+
+    // color lerp
+    colorMaterials.forEach(function(m){
+      m.color.lerp(targetColor, 0.07);
+    });
+
+    // exploded view lerp
+    layers.forEach(function(l){
+      var target = exploded ? l.explodeZ : l.restZ;
+      l.mesh.position.z += (target - l.mesh.position.z) * 0.085;
+    });
+
+    // dust drift
+    if (!reduceMotion) dust.rotation.y += 0.0006;
+
+    phone.updateMatrixWorld();
+    updateHotspots();
+
+    renderer.render(scene, camera);
+  }
+
+  /* ============================================================
+     BOOT
+  ============================================================ */
+  function boot(){
+    setFinish(0);
+    renderer.render(scene, camera);
+    setTimeout(function(){
+      document.getElementById('loader').classList.add('hidden');
+    }, 550);
+    animate();
+  }
+  boot();
+
+})();
+</script>
