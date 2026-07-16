@@ -1,29 +1,31 @@
-Samsung Galaxy S26 Ultra — 3D Showcase
-An immersive, interactive 3D web experience designed to showcase the design and features of the Samsung Galaxy S26 Ultra. This project demonstrates advanced frontend techniques to render high-fidelity 3D assets in a web browser.
+# Samsung Galaxy S26 Ultra 3D Showcase
 
-🔗 Live Preview
-Experience the showcase here: https://lordmantsotsiu.github.io/galaxy-s26-ultra-showcase/
+An immersive, interactive 3D web experience designed to showcase the design and features of the Samsung Galaxy S26 Ultra. This project demonstrates high-performance frontend development, utilizing 3D rendering to create a premium, product-focused user experience for desktop and laptop users.
 
-🎨 Project Overview
-This project was built to explore the intersection of high-end product visualization and interactive web development. It leverages modern web rendering technologies to allow users to manipulate, inspect, and engage with the device in a fully responsive 3D environment.
+## 🔗 Live Demo
+Explore the showcase here: **[https://lordmantsotsiu.github.io/galaxy-s26-ultra-showcase/](https://lordmantsotsiu.github.io/galaxy-s26-ultra-showcase/)**
 
-🛠 Technical Stack
-Core Technology: [Insert your primary 3D library, e.g., Three.js / React Three Fiber]
+## 🚀 Key Features
+*   **Immersive 3D Experience:** High-fidelity product visualization optimized for modern web browsers.
+*   **Responsive Interaction:** Built specifically for desktop/laptop environments to provide a seamless "unboxing" or product exploration feel.
+*   **Performance-Optimized:** Focused on smooth transitions and high-performance asset loading to maintain a premium feel.
+*   **Modern Frontend Stack:** Utilizes cutting-edge web technologies to deliver interactive components.
 
-Web Standard: HTML5, CSS3 (Tailwind/Styled Components), and JavaScript (ES6+).
+## 🛠 Tech Stack
+*   **Frontend:** [Insert your primary framework, e.g., React, Three.js, or GSAP]
+*   **3D/Animation:** [Insert tools used, e.g., Three.js, React Three Fiber, or Spline]
+*   **Deployment:** GitHub Pages
 
-Performance: Optimized for desktop/laptop browsers to ensure smooth interactions and high-frame-rate rendering.
+## 💡 Why This Project?
+As a Frontend Developer, I wanted to bridge the gap between static product marketing and interactive digital storytelling. This project highlights my ability to:
+*   Implement 3D models in a web-based environment.
+*   Create intuitive user interfaces that emphasize product aesthetics.
+*   Deliver a polished, professional-grade user experience that aligns with high-end brand standards.
 
-Deployment: Hosted via GitHub Pages.
+## 📂 Project Structure
+*   `src/`: Contains the core application logic and components.
+*   `public/`: Assets, including 3D models and textures.
+*   `index.html`: The main entry point for the application.
 
-✨ Key Features
-Interactive 3D Model: Full 360-degree viewing capability.
-
-High-Fidelity Assets: Focused on material accuracy and lighting to highlight the S26 Ultra's premium design.
-
-Responsive Architecture: Designed specifically for laptop/desktop screen real estate to maximize user engagement.
-
-Performance-First: Clean code structure optimized for fast load times and fluid 3D transformations.
-
-💡 Why This Project?
-As a developer, I am constantly looking for ways to push the boundaries of what a browser can do. This project serves as a "proof of work" for my ability to integrate complex 3D rendering with seamless frontend development, ensuring that technical sophistication doesn't come at the cost of user experience.
+## 👤 About the Developer
+I am an AI-native Frontend Developer passionate about building high-end, immersive web experiences. I specialize in combining creative UI design with technical implementation to push the boundaries of what's possible in the browser.
